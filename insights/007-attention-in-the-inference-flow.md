@@ -19,6 +19,29 @@ The attention weights themselves are temporary and are not what gets stored in t
 
 ### Example
 ```ts
+function generate(prompt: string): string {
+  const promptTokens = tokenize(prompt);
+
+  // Prefill runs once for the whole prompt.
+  let state = prefill(promptTokens);
+
+  const generatedTokens: Token[] = [];
+
+  while (true) {
+    // The inference engine samples from the logits.
+    const nextToken = sampleNextToken(state.logits);
+
+    if (nextToken === "<eos>") break;
+
+    generatedTokens.push(nextToken);
+
+    // Decode runs repeatedly, one generated token at a time.
+    state = decode(nextToken, state.kvCache);
+  }
+
+  return detokenize(generatedTokens);
+}
+
 function prefill(promptTokens: Token[]) {
   // Process the whole prompt once.
   return transformerForward({
