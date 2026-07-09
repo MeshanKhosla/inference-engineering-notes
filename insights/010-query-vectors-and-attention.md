@@ -34,17 +34,12 @@ const queryVector = multiply(hiddenVector, W_Q);
 
 `W_Q` is learned during training. After training, it is fixed. During inference, the model uses `W_Q` to transform the current hidden vector into a query vector.
 
+Importantly, this does not replace or directly modify the hidden vector. The hidden vector is still the main representation flowing through the transformer. The query vector is a smaller temporary projection used by an attention head.
+
 Conceptually, the query vector acts like a question the token is asking. For `"creature"`, one attention head might learn a query like:
 
 ```text
 Which earlier words describe me?
-```
-
-That query could match strongly with keys for:
-
-```text
-fluffy
-blue
 ```
 
 This does not mean the model literally stores an English question. The query is a vector, not text. But the vector can behave like a learned search request.
@@ -58,12 +53,32 @@ function createInitialHiddenVector(token: Token, position: number): Vector {
   const tokenEmbedding = embeddingTable[token];
   const positionVector = positionEmbedding(position);
 
+  // tokenEmbedding and positionVector have the same size.
+  // Example:
+  // tokenEmbedding:  Vector<12000>
+  // positionVector: Vector<12000>
+  //
+  // Result:
+  // hiddenVector:   Vector<12000>
   return add(tokenEmbedding, positionVector);
 }
 
-function createQueryVector(hiddenVector: Vector, attentionHead: AttentionHead): Vector {
+function createQueryVector(
+  hiddenVector: Vector,
+  attentionHead: AttentionHead
+): Vector {
   // W_Q is learned during training.
   // The query vector is computed during inference.
+  //
+  // Example dimensions:
+  // hiddenVector: Vector<12000>
+  // W_Q:          Matrix<12000, 128>
+  // queryVector: Vector<128>
+  //
+  // W_Q projects the large hidden vector into a smaller
+  // query space for this specific attention head.
+  // This creates a new query vector; it does not overwrite
+  // or directly modify the original hidden vector.
   return multiply(hiddenVector, attentionHead.W_Q);
 }
 
@@ -90,16 +105,17 @@ const creatureQuery = createQueryVector(
 
 // Conceptually, this head's query might behave like:
 // "Which earlier words describe this noun?"
+//
+// creatureHiddenVector still exists as the main hidden vector.
+// creatureQuery is a smaller temporary vector derived from it.
 ```
 
 ### Where It Lives
-A transformer layer usually contains a multi-head self-attention module. Each attention head can have its own learned query, key, and value matrices:
+A transformer layer usually contains a multi-head self-attention module. Each attention head can have its own learned query matrix.
 
 ```ts
 type AttentionHead = {
   W_Q: Matrix;
-  W_K: Matrix;
-  W_V: Matrix;
 };
 
 type TransformerLayer = {
@@ -117,8 +133,6 @@ Training learns:
 
 ```text
 W_Q
-W_K
-W_V
 embedding tables
 feedforward weights
 output projection weights
@@ -129,8 +143,6 @@ Inference computes:
 ```text
 hidden vectors
 query vectors
-key vectors
-value vectors
 attention weights
 logits
 ```
@@ -138,7 +150,7 @@ logits
 The query vector is not itself a trained weight. It is created during inference by applying a trained weight matrix to the current hidden vector.
 
 ### Mental Model
-> `W_Q` is the learned machine. The query vector is the search request that machine produces for a specific token in a specific context.
+> `W_Q` is the learned machine. The query vector is the smaller search request that machine produces from a token's current hidden vector.
 
 ### Takeaway
-A query vector is how a token asks what information it needs from other tokens. `W_Q` is learned during training, but the query vector is computed during inference from the token's current hidden vector. Different attention heads can learn different kinds of questions, such as looking for adjectives, subjects, references, or other useful relationships.
+A query vector is how a token asks what information it needs. `W_Q` is learned during training, but the query vector is computed during inference from the token's current hidden vector. The query vector is usually smaller than the hidden vector, and creating it does not overwrite the hidden vector.
