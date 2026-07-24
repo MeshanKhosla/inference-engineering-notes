@@ -34,7 +34,7 @@ Divide the two rates:
 
 The seconds cancel, leaving operations per byte.
 
-This `295 operations/byte` is the hardware's approximate balance point. It says that, to keep compute and memory equally busy, a workload would need to perform about 295 floating-point operations for every byte it moves from memory.
+This `295 operations/byte` is the hardware's approximate balance point. It is not something the hardware "gives" to each byte. It is the dividing line where compute speed and memory speed would both be fully used.
 
 The workload has its own arithmetic intensity. Compare that workload number with the hardware balance point.
 
@@ -49,7 +49,7 @@ For example:
 40 operations/byte < 295 operations/byte
 ```
 
-The workload performs relatively little math for each byte moved. The GPU still has unused compute capacity, but performance is limited by how quickly memory can deliver data.
+The workload performs relatively little math for each byte moved. Each byte creates too little work, so the compute units finish quickly and wait for more data. Performance is limited by how quickly memory can deliver bytes.
 
 ```text
 workload intensity > 295 operations/byte
@@ -62,7 +62,7 @@ For example:
 500 operations/byte > 295 operations/byte
 ```
 
-The workload asks for a large amount of computation for each byte moved. Memory can supply data fast enough, but the compute units become the limiting resource.
+The workload asks for a large amount of computation for each byte moved. For every byte, the algorithm needs more operations than the hardware balance point can support while keeping memory and compute equally busy. The memory system can deliver enough data, but the compute units cannot finish the required operations fast enough.
 
 ### When It Matters
 This matters when deciding which optimization can improve performance.
@@ -84,7 +84,15 @@ Compute-bound:
 "The data is available, but the compute units cannot finish the required math fast enough."
 ```
 
-The hardware balance point is the dividing line. The workload's arithmetic intensity tells you which side of that line the workload falls on.
+Another way to say it:
+
+```text
+If the algorithm needs 500 operations per byte,
+and the hardware balance point is 295 operations per byte,
+then the workload is compute-bound.
+```
+
+Why? Because for every byte moved, the algorithm demands a lot of math. Memory can supply the data, but compute cannot satisfy the required operations quickly enough.
 
 ### Takeaway
 The H100 example has an approximate hardware balance point of 295 floating-point operations per byte. A workload below that value is generally memory-bound; a workload above it is generally compute-bound. Arithmetic intensity belongs to the workload, while the 295 operations-per-byte threshold comes from the GPU's hardware capabilities.
